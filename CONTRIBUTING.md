@@ -25,7 +25,7 @@ Thank you for contributing! To maintain the quality, security, and predictabilit
 If you want to introduce a new transformation (e.g., *Moving Average Convergence Divergence (MACD)*):
 
 1.  **Define the Primitive**:
-    In [analytics.py](file:///c:/Users/Allan/Documents/Dev/randall-2-app/analytics.py), implement your primitive as a vectorized, type-hinted function operating on pandas/polars data structures:
+    In [analytics.py](./analytics.py), implement your primitive as a vectorized, type-hinted function operating on pandas/polars data structures:
     ```python
     def compute_macd(series: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9) -> tuple[pd.Series, pd.Series]:
         """Calculates MACD and Signal series."""
@@ -37,7 +37,7 @@ If you want to introduce a new transformation (e.g., *Moving Average Convergence
     ```
 
 2.  **Expose in the Orchestrator**:
-    In [orchestrator.py](file:///c:/Users/Allan/Documents/Dev/randall-2-app/orchestrator.py), update the parser fallback rules (`run_fallback_parser`) and execution map (`execute_plan`) to handle the new transform:
+    In [orchestrator.py](./orchestrator.py), update the parser fallback rules (`run_fallback_parser`) and execution map (`execute_plan`) to handle the new transform:
     ```python
     elif transform == "macd":
         for col in y_cols:
@@ -48,14 +48,14 @@ If you want to introduce a new transformation (e.g., *Moving Average Convergence
     ```
 
 3.  **Update LLM System Prompt**:
-    In [prompts.py](file:///c:/Users/Allan/Documents/Dev/randall-2-app/prompts.py), add the new transform description and schemas to `INTENT_SYSTEM_PROMPT` so the Gemini model understands how and when to invoke it.
+    In [prompts.py](./prompts.py), add the new transform description and schemas to `INTENT_SYSTEM_PROMPT` so the Gemini model understands how and when to invoke it.
 
 ---
 
 ### How to Add a New Asset Data Source
 
 1.  **Update Definitions**:
-    In [ingest.py](file:///c:/Users/Allan/Documents/Dev/randall-2-app/ingest.py), append your asset definition to the mapping constants:
+    In [ingest.py](./ingest.py), append your asset definition to the mapping constants:
     *   If economic (FRED): Add to `FRED_SERIES`.
     *   If financial (Yahoo Finance): Add to `YF_TICKERS`.
 2.  **Add to Ingestion Pipeline**:
