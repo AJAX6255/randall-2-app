@@ -1,0 +1,74 @@
+Best Overall Stack
+Layer	Recommendation
+LLM	Gemini Flash
+UI	Streamlit initially
+Visualization	Altair/Vega-Lite
+Analytics	Polars + DuckDB
+Orchestration	LangGraph
+Memory	Postgres + pgvector
+Voice later	Gemini multimodal
+Why Gemini Flash Specifically
+
+For your workload:
+
+analytical orchestration
+semantic interpretation
+JSON generation
+chart planning
+
+you do NOT need frontier reasoning models most of the time.
+
+Gemini Flash models are:
+
+cheaper
+fast
+low latency
+adequate for orchestration
+
+This matters enormously for conversational dashboards.
+
+Important Architectural Recommendation
+
+The optimal design is probably:
+
+Gemini does:
+- intent extraction
+- tool selection
+- visualization planning
+
+Python engine does:
+- all quantitative transforms
+- all calculations
+- all normalization
+- all statistics
+
+Vega-Lite does:
+- rendering
+- layering
+- interaction
+
+That separation is professionally very important.
+
+Most Affordable “Near Future” Architecture
+
+Honestly I think this is probably your strongest near-term stack:
+
+Gemini Flash
+    ↓
+Structured JSON tool calls
+    ↓
+Polars transformation engine
+    ↓
+Altair/Vega-Lite
+    ↓
+Streamlit UI
+
+because it gives:
+
+openness
+affordability
+reproducibility
+extensibility
+semantic interaction
+
+without needing Bloomberg-scale infrastructure.
