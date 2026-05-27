@@ -51,9 +51,16 @@ def parse_intent(user_prompt: str) -> dict:
         response = model.generate_content(full_prompt)
         plan = json.loads(response.text.strip())
         
-        # Verify default window
+        # Verify defaults
         if "window" not in plan or plan["window"] is None:
             plan["window"] = 60
+        plan.setdefault("reference_y", None)
+        plan.setdefault("show_bollinger", False)
+        plan.setdefault("show_crossovers", False)
+        plan.setdefault("top_k_stress", None)
+        plan.setdefault("horizontal_lines", [])
+        plan.setdefault("vertical_lines", [])
+        plan.setdefault("bands", [])
             
         return plan
         
@@ -77,6 +84,13 @@ def run_fallback_parser(user_prompt: str) -> dict:
         "anchor_date": None,
         "smooth_window": None,
         "show_regimes": False,
+        "reference_y": None,
+        "show_bollinger": False,
+        "show_crossovers": False,
+        "top_k_stress": None,
+        "horizontal_lines": [],
+        "vertical_lines": [],
+        "bands": [],
         "analysis_text": "Parsed using local rules. (Set GEMINI_API_KEY in .env for advanced semantic querying)."
     }
 
@@ -138,6 +152,30 @@ def run_fallback_parser(user_prompt: str) -> dict:
 
     if "regime" in p_lower or "shading" in p_lower:
         plan["show_regimes"] = True
+
+    # Bollinger Bands detection
+    if "bollinger" in p_lower or "band" in p_lower:
+        plan["show_bollinger"] = True
+
+    # Crossover detection
+    if "crossover" in p_lower or "cross" in p_lower:
+        plan["show_crossovers"] = True
+
+    # Reference Y detection
+    if "zero" in p_lower or "reference" in p_lower:
+        plan["reference_y"] = 0.0
+    
+    # Custom reference number (e.g. reference line at 1.5)
+    ref_match = re.search(r"ref(?:erence)?\s*(?:line)?\s*(?:at)?\s*(-?\d+(?:\.\d+)?)", p_lower)
+    if ref_match:
+        plan["reference_y"] = float(ref_match.group(1))
+
+    # Top-K Stress detection
+    stress_match = re.search(r"(?:highlight|show|top)\s*(\d+)\s*(?:stress|extreme|worst)", p_lower)
+    if stress_match:
+        plan["top_k_stress"] = int(stress_match.group(1))
+    elif "stress" in p_lower or "extreme" in p_lower:
+        plan["top_k_stress"] = 5
 
     # Anchor date extraction
     date_match = re.search(r"\b(20\d{2}-\d{2}-\d{2})\b", user_prompt)

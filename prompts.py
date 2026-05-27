@@ -66,6 +66,10 @@ JSON OUTPUT SCHEMA:
   "anchor_date": "YYYY-MM-DD" or null,           # Set if user requests anchoring to a pivot point / event
   "smooth_window": int or null,                  # Exponential smoothing span (e.g., 10, 20) or null
   "show_regimes": boolean,                        # If true, show macro supply/demand regimes shading
+  "reference_y": float or null,                  # Optional horizontal reference line at a specific value (e.g. 0.0)
+  "show_bollinger": boolean,                      # If true, show Bollinger Bands (20-day rolling mean +/- 2 std dev)
+  "show_crossovers": boolean,                     # If true, show 50/200 SMA golden/death cross markers
+  "top_k_stress": int or null,                    # Highlight top-K single-day absolute percent returns
   "analysis_text": "String describing the analytical reasoning for the chart setup"
 }
 

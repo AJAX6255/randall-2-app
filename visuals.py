@@ -98,7 +98,14 @@ def build_macro_chart(
     regime_df: pd.DataFrame = None,
     normalize: bool = False,
     log_scale: bool = False,
-    brush_selection = None
+    brush_selection = None,
+    reference_y: float = None,
+    show_bollinger: bool = False,
+    show_crossovers: bool = False,
+    top_k_stress: int = None,
+    horizontal_lines: list[dict] = None,
+    vertical_lines: list[dict] = None,
+    bands: list[dict] = None
 ) -> alt.Chart:
     """
     Creates a layered, interactive macro chart.
@@ -114,6 +121,13 @@ def build_macro_chart(
         normalize: If True, indicates that the series are normalized (adds appropriate titles).
         log_scale: If True, applies log scaling to the y-axis.
         brush_selection: An optional Altair brush selection object for linked zooming/brushing.
+        reference_y: Optional horizontal reference line at a specific value.
+        show_bollinger: If True, renders Bollinger Bands (20-day rolling mean +/- 2 std dev).
+        show_crossovers: If True, renders 50/200 SMA golden/death cross markers.
+        top_k_stress: Optional integer to highlight top-K single-day absolute percent returns.
+        horizontal_lines: List of dicts specifying horizontal levels and labels to render.
+        vertical_lines: List of dicts specifying vertical dates and labels to render.
+        bands: List of dicts specifying horizontal range bands and labels to render.
     """
     df_reset = df.reset_index()
     if "date" not in df_reset.columns:
@@ -150,19 +164,44 @@ def build_macro_chart(
     raw_stroke_width = 1.0 if smooth_window else 2.0
     raw_opacity = 0.35 if smooth_window else 0.85
     
-    raw_line = alt.Chart(melted_df).mark_line(
-        strokeWidth=raw_stroke_width,
-        opacity=raw_opacity
-    ).encode(
-        x=x_scale_spec,
-        y=alt.Y("Value:Q", scale=y_scale, axis=axis_style, title=y_axis_title),
-        color=alt.Color("Series:N", scale=alt.Scale(range=COLOR_PALETTE), legend=alt.Legend(title="Assets")),
-        tooltip=[
-            "date:T",
-            "Series:N",
-            alt.Tooltip("Value:Q", format=".2f", title="Price/Value")
-        ]
-    )
+    # Styled drawdown area if Y axis is Drawdown
+    if "drawdown" in y_axis_title.lower() or "drawdown" in title.lower():
+        gradient_fill = alt.Gradient(
+            gradient="linear",
+            stops=[
+                alt.GradientStop(color="rgba(255, 61, 0, 0.4)", offset=0),
+                alt.GradientStop(color="rgba(255, 61, 0, 0.0)", offset=1)
+            ],
+            x1=1, y1=0, x2=1, y2=1
+        )
+        raw_line = alt.Chart(melted_df).mark_area(
+            line={"color": "#ff3d00", "strokeWidth": 2},
+            color=gradient_fill,
+            opacity=raw_opacity
+        ).encode(
+            x=x_scale_spec,
+            y=alt.Y("Value:Q", scale=y_scale, axis=axis_style, title=y_axis_title),
+            color=alt.Color("Series:N", scale=alt.Scale(range=COLOR_PALETTE), legend=alt.Legend(title="Assets")),
+            tooltip=[
+                "date:T",
+                "Series:N",
+                alt.Tooltip("Value:Q", format=".2f", title="Drawdown (%)")
+            ]
+        )
+    else:
+        raw_line = alt.Chart(melted_df).mark_line(
+            strokeWidth=raw_stroke_width,
+            opacity=raw_opacity
+        ).encode(
+            x=x_scale_spec,
+            y=alt.Y("Value:Q", scale=y_scale, axis=axis_style, title=y_axis_title),
+            color=alt.Color("Series:N", scale=alt.Scale(range=COLOR_PALETTE), legend=alt.Legend(title="Assets")),
+            tooltip=[
+                "date:T",
+                "Series:N",
+                alt.Tooltip("Value:Q", format=".2f", title="Price/Value")
+            ]
+        )
 
     layers = [raw_line]
 
@@ -194,6 +233,200 @@ def build_macro_chart(
             ]
         )
         layers.append(smooth_line)
+
+    # Bollinger Bands
+    if show_bollinger:
+        bb_chart = alt.Chart(melted_df).transform_window(
+            window=[
+                {"op": "mean", "field": "Value", "as": "sma20"},
+                {"op": "stdev", "field": "Value", "as": "std20"}
+            ],
+            frame=[-19, 0],
+            groupby=["Series"],
+            sort=[{"field": "date"}]
+        ).transform_calculate(
+            upper_band="datum.sma20 + 2 * datum.std20",
+            lower_band="datum.sma20 - 2 * datum.std20"
+        )
+        
+        bb_band = bb_chart.mark_area(opacity=0.12).encode(
+            x=x_scale_spec,
+            y=alt.Y("lower_band:Q", scale=y_scale),
+            y2="upper_band:Q",
+            color=alt.Color("Series:N")
+        )
+        
+        bb_sma = bb_chart.mark_line(strokeWidth=1, strokeDash=[2, 2]).encode(
+            x=x_scale_spec,
+            y=alt.Y("sma20:Q"),
+            color=alt.Color("Series:N")
+        )
+        layers.insert(0, bb_band)
+        layers.append(bb_sma)
+
+    # SMA Crossovers (Golden & Death Crosses)
+    if show_crossovers:
+        crossover_chart = alt.Chart(melted_df).transform_window(
+            sma50="mean(Value)",
+            frame=[-49, 0],
+            groupby=["Series"],
+            sort=[{"field": "date"}]
+        ).transform_window(
+            sma200="mean(Value)",
+            frame=[-199, 0],
+            groupby=["Series"],
+            sort=[{"field": "date"}]
+        ).transform_window(
+            window=[
+                {"op": "lag", "field": "sma50", "as": "prev_sma50"},
+                {"op": "lag", "field": "sma200", "as": "prev_sma200"}
+            ],
+            groupby=["Series"],
+            sort=[{"field": "date"}]
+        ).transform_calculate(
+            crossover="datum.prev_sma50 <= datum.prev_sma200 && datum.sma50 > datum.sma200 ? 'Bullish' : (datum.prev_sma50 >= datum.prev_sma200 && datum.sma50 < datum.sma200 ? 'Bearish' : null)"
+        ).transform_filter(
+            "datum.crossover != null"
+        )
+        
+        crossover_points = crossover_chart.mark_point(size=120, filled=True).encode(
+            x=x_scale_spec,
+            y=alt.Y("Value:Q"),
+            color=alt.Color("crossover:N", scale=alt.Scale(domain=["Bullish", "Bearish"], range=["#00e676", "#ff3d00"]), legend=alt.Legend(title="Crossover")),
+            shape=alt.Shape("crossover:N", scale=alt.Scale(domain=["Bullish", "Bearish"], range=["triangle-up", "triangle-down"]), legend=None),
+            tooltip=["date:T", "Series:N", alt.Tooltip("Value:Q", format=".2f"), "crossover:N"]
+        )
+        layers.append(crossover_points)
+
+    # Reference Y Line
+    if reference_y is not None:
+        ref_line = alt.Chart().mark_rule(
+            color="#cbd5e0",
+            strokeDash=[4, 4],
+            strokeWidth=1.5
+        ).encode(
+            y=alt.datum(reference_y)
+        )
+        layers.append(ref_line)
+
+    # Custom Horizontal Lines with Labels
+    if horizontal_lines:
+        for line in horizontal_lines:
+            val = line.get("value")
+            label = line.get("label", "")
+            if val is not None:
+                h_line = alt.Chart().mark_rule(
+                    color="#ffea00",
+                    strokeDash=[4, 4],
+                    strokeWidth=1.5
+                ).encode(
+                    y=alt.datum(val)
+                )
+                layers.append(h_line)
+                
+                if label:
+                    h_label = alt.Chart().mark_text(
+                        align="left",
+                        dx=8,
+                        dy=-5,
+                        color="#ffea00",
+                        fontSize=10,
+                        fontWeight="bold"
+                    ).encode(
+                        x=alt.value(10),
+                        y=alt.datum(val),
+                        text=alt.datum(label)
+                    )
+                    layers.append(h_label)
+
+    # Custom Vertical Lines with Labels
+    if vertical_lines:
+        for line in vertical_lines:
+            date_val = line.get("date")
+            label = line.get("label", "")
+            if date_val:
+                iso_date = pd.to_datetime(date_val).isoformat()
+                v_line = alt.Chart().mark_rule(
+                    color="#e2e8f0",
+                    strokeDash=[4, 4],
+                    strokeWidth=1.5
+                ).encode(
+                    x=alt.datum(iso_date)
+                )
+                layers.append(v_line)
+                
+                if label:
+                    v_label = alt.Chart().mark_text(
+                        align="left",
+                        angle=270,
+                        dx=8,
+                        dy=12,
+                        color="#e2e8f0",
+                        fontSize=10,
+                        fontWeight="bold"
+                    ).encode(
+                        x=alt.datum(iso_date),
+                        y=alt.value(20),
+                        text=alt.datum(label)
+                    )
+                    layers.append(v_label)
+
+    # Custom Horizontal Bands with Labels
+    if bands:
+        for band in bands:
+            ymin = band.get("ymin")
+            ymax = band.get("ymax")
+            label = band.get("label", "")
+            if ymin is not None and ymax is not None:
+                band_rect = alt.Chart().mark_rect(
+                    color="#00e5ff",
+                    opacity=0.08
+                ).encode(
+                    y=alt.datum(ymin),
+                    y2=alt.datum(ymax)
+                )
+                layers.insert(0, band_rect)
+                
+                if label:
+                    band_label = alt.Chart().mark_text(
+                        align="left",
+                        dx=8,
+                        dy=12,
+                        color="#00e5ff",
+                        fontSize=10,
+                        fontWeight="bold",
+                        opacity=0.7
+                    ).encode(
+                        x=alt.value(10),
+                        y=alt.datum(ymin),
+                        text=alt.datum(label)
+                    )
+                    layers.append(band_label)
+
+    # Top-K Stress Highlights
+    if top_k_stress is not None and top_k_stress > 0:
+        stress_marker_chart = alt.Chart(melted_df).transform_window(
+            window=[{"op": "lag", "field": "Value", "as": "prev_value"}],
+            groupby=["Series"],
+            sort=[{"field": "date"}]
+        ).transform_calculate(
+            daily_change="datum.prev_value ? abs(datum.Value - datum.prev_value) / datum.prev_value : 0"
+        ).transform_window(
+            window=[{"op": "rank", "as": "rank"}],
+            sort=[{"field": "daily_change", "order": "descending"}],
+            groupby=["Series"]
+        ).transform_filter(
+            f"datum.rank <= {top_k_stress}"
+        )
+        
+        stress_markers = stress_marker_chart.mark_point(
+            size=150, strokeWidth=2, color="#ff3d00"
+        ).encode(
+            x=x_scale_spec,
+            y=alt.Y("Value:Q"),
+            tooltip=["date:T", "Series:N", alt.Tooltip("Value:Q", format=".2f"), alt.Tooltip("daily_change:Q", format=".2%", title="Daily Abs Return")]
+        )
+        layers.append(stress_markers)
 
     # 4. Optional Background Shading for Macro Regimes
     if show_regimes and regime_df is not None and not regime_df.empty:
