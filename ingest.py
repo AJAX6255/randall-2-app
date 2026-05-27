@@ -24,6 +24,23 @@ TODAY = datetime.date.today()
 END_DATE = TODAY - datetime.timedelta(days=1)
 START_DATE = END_DATE - datetime.timedelta(days=365)  # 1 year of history
 
+def get_date_range(timeframe: str) -> tuple[datetime.date, datetime.date]:
+    """Helper to convert a timeframe string into start and end dates."""
+    today = datetime.date.today()
+    end_date = today - datetime.timedelta(days=1)
+    if timeframe == "2yr":
+        days = 2 * 365
+    elif timeframe == "1yr":
+        days = 365
+    elif timeframe == "6mo":
+        days = 180
+    elif timeframe == "1mo":
+        days = 30
+    else:
+        days = 365
+    start_date = end_date - datetime.timedelta(days=days)
+    return start_date, end_date
+
 # Definitions
 FRED_SERIES = {
     "SOFR": "SOFR",
@@ -97,19 +114,22 @@ def is_cache_fresh(series_id: str, max_age_hours: int = 12) -> bool:
     age = datetime.datetime.now() - last_updated
     return age.total_seconds() < (max_age_hours * 3600)
 
-def fetch_fred_series(series_name: str, series_id: str) -> pd.DataFrame:
+def fetch_fred_series(series_name: str, series_id: str, start_date: datetime.date = None, end_date: datetime.date = None) -> pd.DataFrame:
     """Fetch time series from Federal Reserve Economic Data (FRED)."""
     if not FRED_API_KEY:
         print(f"Skipping FRED {series_name}: No FRED_API_KEY in .env")
         return pd.DataFrame()
+    
+    s_date = start_date or START_DATE
+    e_date = end_date or END_DATE
     
     url = "https://api.stlouisfed.org/fred/series/observations"
     params = {
         "series_id": series_id,
         "api_key": FRED_API_KEY,
         "file_type": "json",
-        "observation_start": START_DATE.strftime("%Y-%m-%d"),
-        "observation_end": END_DATE.strftime("%Y-%m-%d")
+        "observation_start": s_date.strftime("%Y-%m-%d"),
+        "observation_end": e_date.strftime("%Y-%m-%d")
     }
     
     try:
@@ -126,8 +146,10 @@ def fetch_fred_series(series_name: str, series_id: str) -> pd.DataFrame:
         print(f"Error fetching FRED series {series_id}: {e}")
         return pd.DataFrame()
 
-def fetch_stablecoin_marketcap() -> pd.DataFrame:
+def fetch_stablecoin_marketcap(start_date: datetime.date = None, end_date: datetime.date = None) -> pd.DataFrame:
     """Fetch total stablecoin market cap history from Llama.fi."""
+    s_date = start_date or START_DATE
+    e_date = end_date or END_DATE
     try:
         url = "https://stablecoins.llama.fi/stablecoincharts/all"
         res = requests.get(url, timeout=10)
@@ -146,8 +168,8 @@ def fetch_stablecoin_marketcap() -> pd.DataFrame:
         
         df = pd.DataFrame(records)
         df = df[
-            (df["date"] >= pd.Timestamp(START_DATE)) &
-            (df["date"] <= pd.Timestamp(END_DATE))
+            (df["date"] >= pd.Timestamp(s_date)) &
+            (df["date"] <= pd.Timestamp(e_date))
         ]
         df.set_index("date", inplace=True)
         df = df.resample("B").last()  # Business days resample
@@ -158,10 +180,12 @@ def fetch_stablecoin_marketcap() -> pd.DataFrame:
         print(f"Error fetching stablecoin marketcap: {e}")
         return pd.DataFrame()
 
-def fetch_yf_series(ticker: str, column_name: str) -> pd.DataFrame:
+def fetch_yf_series(ticker: str, column_name: str, start_date: datetime.date = None, end_date: datetime.date = None) -> pd.DataFrame:
     """Fetch adjusted close price data from Yahoo Finance."""
+    s_date = start_date or START_DATE
+    e_date = end_date or END_DATE
     try:
-        df = yf.download(ticker, start=START_DATE, end=END_DATE, progress=False)
+        df = yf.download(ticker, start=s_date, end=e_date, progress=False)
         if df.empty:
             return pd.DataFrame()
             
@@ -199,24 +223,27 @@ def fetch_yf_series(ticker: str, column_name: str) -> pd.DataFrame:
 # ORCHESTRATED INGESTION & PIPELINE ALIGNMENT
 # -----------------------------------------------------------------------------
 
-def ingest_all(force: bool = False):
+def ingest_all(force: bool = False, start_date: datetime.date = None, end_date: datetime.date = None):
     """
     Verify/fetch all series and store them in the DuckDB/Parquet cache.
     """
     db.init_db()
 
+    s_date = start_date or START_DATE
+    e_date = end_date or END_DATE
+
     # 1. FRED Series
     for name, fred_id in FRED_SERIES.items():
         if force or not is_cache_fresh(name):
             print(f"Fetching FRED series: {name} ({fred_id})...")
-            df = fetch_fred_series(name, fred_id)
+            df = fetch_fred_series(name, fred_id, start_date=s_date, end_date=e_date)
             if not df.empty:
                 db.save_series(name, df)
 
     # 2. Stablecoins
     if force or not is_cache_fresh("stablecoin_mkt_cap"):
         print("Fetching Stablecoins Market Cap from Llama.fi...")
-        df = fetch_stablecoin_marketcap()
+        df = fetch_stablecoin_marketcap(start_date=s_date, end_date=e_date)
         if not df.empty:
             db.save_series("stablecoin_mkt_cap", df)
 
@@ -224,11 +251,11 @@ def ingest_all(force: bool = False):
     for name, ticker in YF_TICKERS.items():
         if force or not is_cache_fresh(name):
             print(f"Fetching Yahoo Finance ticker: {ticker}...")
-            df = fetch_yf_series(ticker, name)
+            df = fetch_yf_series(ticker, name, start_date=s_date, end_date=e_date)
             if not df.empty:
                 db.save_series(name, df)
 
-def get_aligned_dataset() -> pd.DataFrame:
+def get_aligned_dataset(start_date: datetime.date = None, end_date: datetime.date = None) -> pd.DataFrame:
     """
     Load all cached assets using Polars lazy frames, merge them onto
     a master business-day index, and forward fill.
@@ -236,15 +263,34 @@ def get_aligned_dataset() -> pd.DataFrame:
     Returns:
         pd.DataFrame: Aligned historical dataset.
     """
-    # Force ingest if cache is empty
+    # Verify if cache is empty or doesn't cover the requested date range
     all_cached = db.get_all_cached_series()
+    s_date = start_date or START_DATE
+    e_date = end_date or END_DATE
+
+    cache_needs_sync = False
     if not all_cached:
-        print("No cache detected. Running initial ingestion...")
-        ingest_all(force=True)
+        cache_needs_sync = True
+    else:
+        try:
+            spy_df = db.get_series("SPY")
+            if not spy_df.empty:
+                cached_min = spy_df["date"].min().date()
+                cached_max = spy_df["date"].max().date()
+                if cached_min > s_date or cached_max < e_date:
+                    cache_needs_sync = True
+            else:
+                cache_needs_sync = True
+        except Exception:
+            cache_needs_sync = True
+
+    if cache_needs_sync:
+        print(f"Cache is empty or doesn't cover requested range ({s_date} to {e_date}). Running initial sync...")
+        ingest_all(force=True, start_date=s_date, end_date=e_date)
         all_cached = db.get_all_cached_series()
 
     # Define business day skeleton
-    date_range = pd.bdate_range(start=START_DATE, end=END_DATE)
+    date_range = pd.bdate_range(start=s_date, end=e_date)
     master_df = pd.DataFrame({"date": date_range})
 
     # Merge FRED

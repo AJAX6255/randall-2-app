@@ -484,3 +484,20 @@ The resulting system should represent:
 
 > a semantic operating system for macro-financial exploration.
 
+Once running, the dashboard will display:
+
+1. **10-Year Treasury Yield (DGS10)** - Shows the yield on 10-year US Treasury bonds
+2. **SOFR vs FFR (Zoomed Spread View)** - Compares Secured Overnight Financing Rate with Federal Funds Rate
+3. **SOFR Spread (SOFR - FFR)** - Visualizes the spread between SOFR and Federal Funds Rate
+4. **Stablecoin Market Cap (USD)** - Tracks the total market capitalization of stablecoins
+5. **Stablecoin Market Cap (% Change)** - Shows percentage changes in stablecoin market cap
+6. **Individual ETF Charts** - Displays price movements for:
+   - VIX Index (Volatility)
+   - SPY ETF (S&P 500)
+   - GLD ETF (Gold)
+   - VTIP ETF (Inflation-Protected Treasuries)
+   - TLT ETF (Long-Term Treasuries)
+   - CRCL ETF (Circle Stablecoin)
+   - DRAM ETF (Memory/AI Data Center)
+   - JNK ETF (High-Yield Bonds)
+   - EMB ETF (Emerging Market Bonds)

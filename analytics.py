@@ -358,3 +358,47 @@ def macro_event_alignment(series: pd.Series, dates: pd.Series, event_date: str) 
     temp_df["aligned_val"] = (temp_df["value"] / event_val) * 100.0
     
     return temp_df[["offset", "aligned_val", "date"]]
+
+def calculate_stress_composite(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calculates the systemic stress composite index.
+    Combines VIX, JNK/TLT, Stablecoin Mkt Cap, and SOFR_Spread.
+    Returns a DataFrame containing 'date', 'stress_composite', and 'stress_regime'.
+    """
+    df_out = pd.DataFrame({"date": df["date"]})
+    
+    # 1. VIX
+    vix = df["VIX"]
+    v_min, v_max = vix.min(), vix.max()
+    vix_score = (vix - v_min) / (v_max - v_min) * 100.0 if v_max != v_min else pd.Series(0.0, index=df.index)
+    
+    # 2. Credit Stress (JNK/TLT ratio) - falling ratio means more stress
+    credit_ratio = df["JNK"] / df["TLT"]
+    cr_min, cr_max = credit_ratio.min(), credit_ratio.max()
+    credit_score = (cr_max - credit_ratio) / (cr_max - cr_min) * 100.0 if cr_max != cr_min else pd.Series(0.0, index=df.index)
+    
+    # 3. Stablecoin Liquidity (contraction means more stress)
+    stable = df["Stablecoin Mkt Cap"]
+    s_min, s_max = stable.min(), stable.max()
+    stable_score = (s_max - stable) / (s_max - s_min) * 100.0 if s_max != s_min else pd.Series(0.0, index=df.index)
+    
+    # 4. Funding Spread (SOFR - FFR) - higher spread means more stress
+    sofr_spread = df["SOFR_Spread"]
+    sf_min, sf_max = sofr_spread.min(), sofr_spread.max()
+    funding_score = (sofr_spread - sf_min) / (sf_max - sf_min) * 100.0 if sf_max != sf_min else pd.Series(0.0, index=df.index)
+    
+    # Composite
+    df_out["stress_composite"] = (vix_score + credit_score + stable_score + funding_score) / 4.0
+    
+    # Regime segmentation
+    conditions = [
+        df_out["stress_composite"] < 25.0,
+        (df_out["stress_composite"] >= 25.0) & (df_out["stress_composite"] < 50.0),
+        (df_out["stress_composite"] >= 50.0) & (df_out["stress_composite"] < 75.0),
+        df_out["stress_composite"] >= 75.0
+    ]
+    labels = ["Low Stress", "Moderate Stress", "High Stress", "Crisis"]
+    df_out["stress_regime"] = np.select(conditions, labels, default="Unknown")
+    
+    return df_out
+
