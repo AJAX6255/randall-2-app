@@ -12,6 +12,10 @@ and executes deterministic analytical operations on the dataset.
 import os
 import json
 import re
+import google.auth
+# Disable conflicting gcloud ADC credentials to let the developer API key take precedence
+google.auth.default = lambda *args, **kwargs: (None, None)
+
 import google.generativeai as genai
 import pandas as pd
 import numpy as np
@@ -42,7 +46,7 @@ def parse_intent(user_prompt: str) -> dict:
     try:
         # Configure model
         model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
+            model_name="gemini-2.5-flash",
             generation_config={"response_mime_type": "application/json"}
         )
         
