@@ -16,7 +16,7 @@ import pandas as pd
 # NORMALIZATION & SCALING
 # -----------------------------------------------------------------------------
 
-def normalize_series(series: pd.Series, dates: pd.Series, anchor_date: str or pd.Timestamp) -> pd.Series:
+def normalize_series(series: pd.Series, dates: pd.Series, anchor_date: str | pd.Timestamp) -> pd.Series:
     """
     Normalizes a series to equal 100 on a specific anchor date.
     Formula: (x_t / x_anchor) * 100
