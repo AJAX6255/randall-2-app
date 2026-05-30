@@ -62,13 +62,11 @@ def get_bloomberg_theme():
 
 # Register theme
 alt.themes.register("bloomberg_dark", get_bloomberg_theme)
-alt.themes.enable("bloomberg_dark")
+# Commented out global enablement to allow Streamlit's default responsive Altair theme to adapt to Light/Dark modes
+# alt.themes.enable("bloomberg_dark")
 
-# Custom axis style helper
+# Custom axis style helper (omit hardcoded colors to allow responsive rendering)
 axis_style = alt.Axis(
-    gridColor="#1a202c",
-    labelColor="#a0aec0",
-    titleColor="#e2e8f0",
     labelFontSize=11,
     titleFontSize=12,
     tickCount=8
@@ -316,7 +314,7 @@ def build_macro_chart(
             label = line.get("label", "")
             if val is not None:
                 h_line = alt.Chart().mark_rule(
-                    color="#ffea00",
+                    color="#eab308",
                     strokeDash=[4, 4],
                     strokeWidth=1.5
                 ).encode(
@@ -329,7 +327,7 @@ def build_macro_chart(
                         align="left",
                         dx=8,
                         dy=-5,
-                        color="#ffea00",
+                        color="#eab308",
                         fontSize=10,
                         fontWeight="bold"
                     ).encode(
@@ -347,7 +345,7 @@ def build_macro_chart(
             if date_val:
                 iso_date = pd.to_datetime(date_val).isoformat()
                 v_line = alt.Chart().mark_rule(
-                    color="#e2e8f0",
+                    color="#718096",
                     strokeDash=[4, 4],
                     strokeWidth=1.5
                 ).encode(
@@ -361,7 +359,7 @@ def build_macro_chart(
                         angle=270,
                         dx=8,
                         dy=12,
-                        color="#e2e8f0",
+                        color="#718096",
                         fontSize=10,
                         fontWeight="bold"
                     ).encode(
@@ -449,14 +447,15 @@ def build_macro_chart(
         color_range = [regime_colors[r] for r in domain]
 
         # Use a very subtle opacity (0.08) so the background shading does not obstruct the data lines
-        shading = alt.Chart(reg_df).mark_rect(opacity=0.08).encode(
+        shading = alt.Chart(reg_df).mark_rect().encode(
             x=alt.X("date:T"),
             x2="next_date:T",
             color=alt.Color(
                 "regime:N",
                 scale=alt.Scale(domain=domain, range=color_range),
                 legend=alt.Legend(title="Macro Regimes", orient="bottom")
-            )
+            ),
+            opacity=alt.value(0.08)
         )
         # Place shading at the bottom of layer list so lines draw over it
         layers.insert(0, shading)
@@ -467,7 +466,7 @@ def build_macro_chart(
         opacity=alt.condition(hover_selection, alt.value(0.5), alt.value(0.0))
     ).add_params(hover_selection)
 
-    points = raw_line.mark_point(size=60, fill="#0b0e14").encode(
+    points = raw_line.mark_point(size=60).encode(
         opacity=alt.condition(hover_selection, alt.value(1.0), alt.value(0.0))
     )
 
@@ -478,7 +477,6 @@ def build_macro_chart(
         title=alt.TitleParams(
             text=title,
             anchor="start",
-            color="white",
             fontSize=16,
             fontWeight="bold"
         )

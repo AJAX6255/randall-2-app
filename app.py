@@ -32,44 +32,32 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom styling override for a premium dark terminal appearance
+# Custom styling override for a premium responsive Bloomberg-style appearance
 st.markdown("""
 <style>
-    /* Global Background and Fonts */
-    .stApp {
-        background-color: #0b0e14;
-        color: #e2e8f0;
-    }
-    
     /* Custom headers */
     h1, h2, h3 {
         font-family: 'Inter', system-ui, sans-serif !important;
         font-weight: 700 !important;
-        color: #f7fafc !important;
+        color: var(--text-color) !important;
     }
     
     /* Metric boxes */
     div[data-testid="stMetricValue"] {
         font-family: 'Courier New', monospace;
         font-size: 2rem;
-        color: #00e5ff !important;
+        color: var(--primary-color) !important;
     }
     
     /* Chat inputs */
     .stChatInput {
-        border-color: #2d3748 !important;
-    }
-    
-    /* Sidebar styling */
-    section[data-testid="stSidebar"] {
-        background-color: #0e121a !important;
-        border-right: 1px solid #1f2633;
+        border-color: var(--border-color) !important;
     }
     
     /* Custom card container styling */
     .macro-card {
-        background-color: #121722;
-        border: 1px solid #1f2633;
+        background-color: var(--secondary-background-color);
+        border: 1px solid var(--border-color);
         border-radius: 8px;
         padding: 18px;
         margin-bottom: 15px;
@@ -77,22 +65,22 @@ st.markdown("""
     
     /* High contrast radio selectors (Timeframe Selector) */
     div[data-testid="stRadio"] {
-        background-color: #161e2e !important;
+        background-color: var(--secondary-background-color) !important;
         padding: 6px 14px !important;
         border-radius: 6px !important;
-        border: 1px solid #2d3748 !important;
+        border: 1px solid var(--border-color) !important;
     }
     div[data-testid="stRadio"] label {
-        color: #ffffff !important;
+        color: var(--text-color) !important;
         font-weight: 600 !important;
     }
     div[data-testid="stRadio"] label p {
-        color: #ffffff !important;
+        color: var(--text-color) !important;
         font-weight: 700 !important;
         font-size: 0.95rem !important;
     }
     div[data-testid="stRadio"] label:hover p {
-        color: #00e5ff !important;
+        color: var(--primary-color) !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -147,7 +135,7 @@ with st.sidebar:
             f"""
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 2px 0;">
                 <div style="width: 10px; height: 10px; border-radius: 50%; background-color: {color}; box-shadow: 0 0 8px {color};"></div>
-                <span style="font-family: 'Courier New', monospace; font-size: 0.85rem; font-weight: bold; color: #e2e8f0;">{text}</span>
+                <span style="font-family: 'Courier New', monospace; font-size: 0.85rem; font-weight: bold; color: var(--text-color);">{text}</span>
             </div>
             """,
             unsafe_allow_html=True
