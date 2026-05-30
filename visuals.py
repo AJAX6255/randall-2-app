@@ -426,39 +426,7 @@ def build_macro_chart(
         )
         layers.append(stress_markers)
 
-    # 4. Optional Background Shading for Macro Regimes
-    if show_regimes and regime_df is not None and not regime_df.empty:
-        reg_df = regime_df.copy()
-        reg_df["date"] = pd.to_datetime(reg_df["date"])
-        reg_df["next_date"] = reg_df["date"].shift(-1).fillna(reg_df["date"] + pd.Timedelta(days=1))
-        
-        # Color mapping for regimes (HEX colors for stability in Altair scales)
-        regime_colors = {
-            "Oil Supply Shock": "#ef4444",   # Red
-            "Oil Demand Shock": "#22c55e",   # Green
-            "Flight to Safety": "#f97316",   # Orange
-            "Expansionary": "#00e5ff",       # Cyan
-            "Neutral": "#1e293b"             # Muted slate/grey
-        }
-        
-        # Find unique regimes in data to populate correct domain
-        unique_regimes = reg_df["regime"].unique().tolist()
-        domain = [r for r in regime_colors.keys() if r in unique_regimes]
-        color_range = [regime_colors[r] for r in domain]
 
-        # Use a very subtle opacity (0.08) so the background shading does not obstruct the data lines
-        shading = alt.Chart(reg_df).mark_rect().encode(
-            x=alt.X("date:T"),
-            x2="next_date:T",
-            color=alt.Color(
-                "regime:N",
-                scale=alt.Scale(domain=domain, range=color_range),
-                legend=alt.Legend(title="Macro Regimes", orient="bottom")
-            ),
-            opacity=alt.value(0.08)
-        )
-        # Place shading at the bottom of layer list so lines draw over it
-        layers.insert(0, shading)
 
     # 5. Interactive cross-hair guidelines
     rule = alt.Chart(melted_df).mark_rule(color="#4a5568", strokeWidth=1.0).encode(
