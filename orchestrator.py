@@ -35,7 +35,9 @@ def parse_intent(user_prompt: str) -> dict:
     Uses Gemini Flash if configured, else falls back to a deterministic regex parser.
     """
     if not GEMINI_API_KEY:
-        return run_fallback_parser(user_prompt)
+        plan = run_fallback_parser(user_prompt)
+        plan["parse_method"] = "local"
+        return plan
         
     try:
         # Configure model
@@ -61,12 +63,16 @@ def parse_intent(user_prompt: str) -> dict:
         plan.setdefault("horizontal_lines", [])
         plan.setdefault("vertical_lines", [])
         plan.setdefault("bands", [])
+        
+        plan["parse_method"] = "gemini"
             
         return plan
         
     except Exception as e:
         print(f"Gemini API Error: {e}. Running fallback parser.")
-        return run_fallback_parser(user_prompt)
+        plan = run_fallback_parser(user_prompt)
+        plan["parse_method"] = "fallback"
+        return plan
 
 def run_fallback_parser(user_prompt: str) -> dict:
     """
@@ -91,7 +97,8 @@ def run_fallback_parser(user_prompt: str) -> dict:
         "horizontal_lines": [],
         "vertical_lines": [],
         "bands": [],
-        "analysis_text": "Parsed using local rules. (Set GEMINI_API_KEY in .env for advanced semantic querying)."
+        "analysis_text": "Parsed using local rules. (Set GEMINI_API_KEY in .env for advanced semantic querying).",
+        "parse_method": "local"
     }
 
     # Column extraction

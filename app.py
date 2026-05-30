@@ -140,25 +140,45 @@ with st.sidebar:
     
     # 1. API Status Indicators
     st.subheader("🔧 System Connections")
+    
+    # Helper to render custom glowing LED status indicators
+    def render_led_indicator(color: str, text: str):
+        st.markdown(
+            f"""
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 2px 0;">
+                <div style="width: 10px; height: 10px; border-radius: 50%; background-color: {color}; box-shadow: 0 0 8px {color};"></div>
+                <span style="font-family: 'Courier New', monospace; font-size: 0.85rem; font-weight: bold; color: #e2e8f0;">{text}</span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
     with st.spinner("Verifying connections..."):
         fred_ok, fred_msg = ingest.check_fred_api()
         stable_ok, stable_msg = ingest.check_stablecoins_api()
         yahoo_ok, yahoo_msg = ingest.check_yfinance_api()
         
-        if fred_ok:
-            st.success(f"● {fred_msg}")
+        # Render connections
+        render_led_indicator("#00e676" if fred_ok else "#ef4444", fred_msg)
+        render_led_indicator("#00e676" if stable_ok else "#ef4444", stable_msg)
+        render_led_indicator("#00e676" if yahoo_ok else "#ef4444", yahoo_msg)
+        
+        # Gemini LLM status detection
+        gemini_status = st.session_state.active_plan.get("parse_method", "local")
+        if not orchestrator.GEMINI_API_KEY:
+            gemini_color = "#ef4444"
+            gemini_text = "Gemini LLM: Not Configured"
+        elif gemini_status == "gemini" or (gemini_status == "local" and orchestrator.GEMINI_API_KEY):
+            gemini_color = "#00e676"
+            gemini_text = "Gemini LLM: Active"
+        elif gemini_status == "fallback":
+            gemini_color = "#eab308"
+            gemini_text = "Gemini LLM: Error (Fallback)"
         else:
-            st.error(f"● {fred_msg}")
+            gemini_color = "#ef4444"
+            gemini_text = "Gemini LLM: Not Configured"
             
-        if stable_ok:
-            st.success(f"● {stable_msg}")
-        else:
-            st.error(f"● {stable_msg}")
-            
-        if yahoo_ok:
-            st.success(f"● {yahoo_msg}")
-        else:
-            st.error(f"● {yahoo_msg}")
+        render_led_indicator(gemini_color, gemini_text)
             
     st.markdown("---")
 
