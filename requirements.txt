@@ -10,4 +10,5 @@ google-genai>=2.7.0
 langgraph>=0.1.0
 matplotlib>=3.5.0
 curl_cffi>=0.15.0
+scipy>=1.10.0
 

@@ -145,8 +145,24 @@ def run_fallback_parser(user_prompt: str) -> dict:
         plan["transform"] = "zscore"
     elif "volatility" in p_lower or "vol" in p_lower:
         plan["transform"] = "volatility"
+    elif "drawdown duration" in p_lower or "recovery time" in p_lower or "recovery duration" in p_lower:
+        plan["transform"] = "drawdown_duration"
     elif "drawdown" in p_lower:
         plan["transform"] = "drawdown"
+    elif "sharpe" in p_lower:
+        plan["transform"] = "sharpe"
+    elif "sortino" in p_lower:
+        plan["transform"] = "sortino"
+    elif "cointegration" in p_lower or "coint" in p_lower:
+        plan["transform"] = "cointegration"
+        if len(found_cols) >= 2:
+            plan["y_cols"] = [found_cols[0]]
+            plan["secondary_asset"] = found_cols[1]
+    elif "granger" in p_lower or "causality" in p_lower:
+        plan["transform"] = "granger"
+        if len(found_cols) >= 2:
+            plan["y_cols"] = [found_cols[0]]
+            plan["secondary_asset"] = found_cols[1]
     elif "relative strength" in p_lower or "ratio" in p_lower or "compare" in p_lower:
         if len(found_cols) >= 2:
             plan["transform"] = "relative_strength"
@@ -256,6 +272,53 @@ def execute_plan(plan: dict, df: pd.DataFrame) -> tuple[pd.DataFrame, list[str],
             df_out[col_name] = analytics.compute_drawdown(df_out[col])
             plot_cols.append(col_name)
         y_label = "Drawdown (%)"
+
+    elif transform == "drawdown_duration":
+        for col in y_cols:
+            col_name = f"{col}_drawdown_dur"
+            df_out[col_name] = analytics.compute_drawdown_duration(df_out[col])
+            plot_cols.append(col_name)
+        y_label = "Drawdown Duration (Business Days)"
+
+    elif transform == "sharpe":
+        for col in y_cols:
+            returns = df_out[col].pct_change().fillna(0.0)
+            rf_daily = (df_out["FFR"] / 100.0) / 252.0
+            col_name = f"{col}_sharpe"
+            df_out[col_name] = analytics.rolling_sharpe_ratio(returns, rf_daily, window)
+            plot_cols.append(col_name)
+        y_label = f"{window}-Day Annualized Sharpe Ratio"
+
+    elif transform == "sortino":
+        for col in y_cols:
+            returns = df_out[col].pct_change().fillna(0.0)
+            rf_daily = (df_out["FFR"] / 100.0) / 252.0
+            col_name = f"{col}_sortino"
+            df_out[col_name] = analytics.rolling_sortino_ratio(returns, rf_daily, window)
+            plot_cols.append(col_name)
+        y_label = f"{window}-Day Annualized Sortino Ratio"
+
+    elif transform == "cointegration":
+        sec_asset = plan.get("secondary_asset")
+        if not sec_asset or sec_asset not in df_out.columns:
+            sec_asset = "SPY" if y_cols[0] != "SPY" else "TLT"
+        prim_asset = y_cols[0]
+        col_name = f"{prim_asset}_{sec_asset}_coint_spread"
+        df_out[col_name] = analytics.rolling_cointegration_spread(df_out[prim_asset], df_out[sec_asset], window)
+        plot_cols.append(col_name)
+        y_label = f"Cointegration Spread ({prim_asset} vs {sec_asset})"
+
+    elif transform == "granger":
+        sec_asset = plan.get("secondary_asset")
+        if not sec_asset or sec_asset not in df_out.columns:
+            sec_asset = "SPY" if y_cols[0] != "SPY" else "TLT"
+        prim_asset = y_cols[0]
+        col_name = f"{sec_asset}_leads_{prim_asset}_granger_p"
+        y_ret = df_out[prim_asset].pct_change().fillna(0.0)
+        x_ret = df_out[sec_asset].pct_change().fillna(0.0)
+        df_out[col_name] = analytics.rolling_granger_causality(y_ret, x_ret, window, lag=2)
+        plot_cols.append(col_name)
+        y_label = f"Granger p-value ({sec_asset} -> {prim_asset})"
 
     elif transform in ["correlation", "beta", "relative_strength"]:
         sec_asset = plan.get("secondary_asset")

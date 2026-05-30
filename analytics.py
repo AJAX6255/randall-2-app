@@ -402,3 +402,153 @@ def calculate_stress_composite(df: pd.DataFrame) -> pd.DataFrame:
     
     return df_out
 
+# -----------------------------------------------------------------------------
+# ADVANCED INSTITUTIONAL ANALYTICS
+# -----------------------------------------------------------------------------
+
+# Try to import scipy for Granger Causality; handle gracefully if not installed
+try:
+    from scipy.stats import f as f_dist
+    HAS_SCIPY = True
+except ImportError:
+    HAS_SCIPY = False
+
+def rolling_sharpe_ratio(returns: pd.Series, risk_free_rate: pd.Series, window: int = 60) -> pd.Series:
+    """
+    Calculates the rolling annualized Sharpe ratio of an asset returns series.
+    Formula: Mean(returns - rf) / StdDev(returns) * sqrt(252)
+    """
+    excess_returns = returns - risk_free_rate
+    rolling_mean = excess_returns.rolling(window, min_periods=max(5, window // 4)).mean()
+    rolling_std = returns.rolling(window, min_periods=max(5, window // 4)).std()
+    
+    # Avoid division by zero
+    rolling_std = rolling_std.replace(0, np.nan)
+    sharpe = (rolling_mean / rolling_std) * np.sqrt(252.0)
+    return sharpe.ffill().fillna(0.0)
+
+def rolling_sortino_ratio(returns: pd.Series, risk_free_rate: pd.Series, window: int = 60) -> pd.Series:
+    """
+    Calculates the rolling annualized Sortino ratio of an asset returns series.
+    Formula: Mean(returns - rf) / DownsideStdDev(returns) * sqrt(252)
+    """
+    excess_returns = returns - risk_free_rate
+    rolling_mean = excess_returns.rolling(window, min_periods=max(5, window // 4)).mean()
+    
+    # Calculate downside standard deviation
+    downside_returns = excess_returns.copy()
+    downside_returns[downside_returns > 0] = 0.0
+    rolling_downside_std = downside_returns.rolling(window, min_periods=max(5, window // 4)).std()
+    
+    # Avoid division by zero
+    rolling_downside_std = rolling_downside_std.replace(0, np.nan)
+    sortino = (rolling_mean / rolling_downside_std) * np.sqrt(252.0)
+    return sortino.ffill().fillna(0.0)
+
+def rolling_cointegration_spread(series1: pd.Series, series2: pd.Series, window: int = 60) -> pd.Series:
+    """
+    Computes the rolling cointegration spread between series1 and series2 using OLS residuals.
+    Formula: spread = series1 - (beta * series2 + alpha)
+    where beta = Cov(series1, series2) / Var(series2)
+    """
+    cov = series1.rolling(window, min_periods=max(5, window // 4)).cov(series2)
+    var = series2.rolling(window, min_periods=max(5, window // 4)).var()
+    
+    # Avoid division by zero
+    var = var.replace(0, np.nan)
+    beta = cov / var
+    
+    mean1 = series1.rolling(window, min_periods=max(5, window // 4)).mean()
+    mean2 = series2.rolling(window, min_periods=max(5, window // 4)).mean()
+    alpha = mean1 - beta * mean2
+    
+    spread = series1 - (beta * series2 + alpha)
+    return spread.ffill().fillna(0.0)
+
+def compute_drawdown_duration(series: pd.Series) -> pd.Series:
+    """
+    Calculates the rolling duration of drawdown in business days.
+    Represents the recovery time from peak-to-trough-to-recovery.
+    """
+    running_max = series.cummax()
+    is_peak = (series == running_max)
+    
+    # Group by cumsum of peaks. Each peak starts a new recovery window.
+    group = is_peak.cumsum()
+    
+    # Calculate offset within each group
+    duration = pd.Series(0, index=series.index)
+    # Groupby cumcount gives 0 at the peak, and increments thereafter
+    raw_duration = duration.groupby(group).cumcount()
+    return raw_duration.astype(float)
+
+def rolling_granger_causality(series_y: pd.Series, series_x: pd.Series, window: int = 60, lag: int = 2) -> pd.Series:
+    """
+    Performs a rolling Granger Causality p-value calculation (tests if X Granger-causes Y).
+    Returns a p-value series. Small p-values (< 0.05) indicate significant lead/causal relationship.
+    """
+    if not HAS_SCIPY:
+        print("Warning: scipy is not installed. Granger causality calculation requires scipy.")
+        return pd.Series(np.nan, index=series_y.index)
+        
+    p_values = []
+    y_values = series_y.values
+    x_values = series_x.values
+    
+    for i in range(len(series_y)):
+        if i < window:
+            p_values.append(0.5)
+            continue
+            
+        sub_y = y_values[i - window + 1:i + 1]
+        sub_x = x_values[i - window + 1:i + 1]
+        
+        n = len(sub_y)
+        obs = n - lag
+        if obs <= 2 * lag + 1:
+            p_values.append(0.5)
+            continue
+            
+        target = sub_y[lag:]
+        
+        # Design matrix unrestricted: constant, lagged y, lagged x
+        design_u = [np.ones(obs)]
+        design_r = [np.ones(obs)]
+        
+        for j in range(1, lag + 1):
+            design_u.append(sub_y[lag - j:n - j])
+            design_r.append(sub_y[lag - j:n - j])
+            
+        for j in range(1, lag + 1):
+            design_u.append(sub_x[lag - j:n - j])
+            
+        X_u = np.column_stack(design_u)
+        X_r = np.column_stack(design_r)
+        
+        try:
+            # Fit unrestricted model
+            beta_u, res_sum_u, _, _ = np.linalg.lstsq(X_u, target, rcond=None)
+            rss_u = res_sum_u[0] if len(res_sum_u) > 0 else np.sum((target - np.dot(X_u, beta_u))**2)
+            
+            # Fit restricted model
+            beta_r, res_sum_r, _, _ = np.linalg.lstsq(X_r, target, rcond=None)
+            rss_r = res_sum_r[0] if len(res_sum_r) > 0 else np.sum((target - np.dot(X_r, beta_r))**2)
+            
+            if rss_u == 0:
+                p_values.append(0.5)
+                continue
+                
+            # Calculate F statistic
+            f_stat = ((rss_r - rss_u) / lag) / (rss_u / (obs - 2 * lag - 1))
+            
+            if f_stat <= 0:
+                p_values.append(1.0)
+            else:
+                p_val = f_dist.sf(f_stat, lag, obs - 2 * lag - 1)
+                p_values.append(p_val)
+        except Exception:
+            p_values.append(0.5)
+            
+    return pd.Series(p_values, index=series_y.index)
+
+

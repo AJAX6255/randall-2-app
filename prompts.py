@@ -38,6 +38,11 @@ AVAILABLE TRANSFORMS:
 - "beta": Calculate rolling beta of first series relative to second series.
 - "relative_strength": Divide the first series by the second series.
 - "pca": Calculate rolling PCA first principal component across selected columns.
+- "sharpe": Calculate rolling annualized Sharpe ratio relative to Federal Funds Rate (FFR).
+- "sortino": Calculate rolling annualized Sortino ratio relative to Federal Funds Rate (FFR).
+- "cointegration": Calculate rolling cointegration spread of first series on second series.
+- "drawdown_duration": Calculate drawdown duration (business days from peak to recovery).
+- "granger": Calculate rolling Granger Causality F-test p-value testing if the second series Granger-causes the first series.
 
 RULES:
 1. If the user mentions synonyms, map them to the correct column name:
@@ -59,7 +64,7 @@ RULES:
 JSON OUTPUT SCHEMA:
 {
   "y_cols": ["COLUMN_NAME_1", "COLUMN_NAME_2"],  # List of primary columns (max 5)
-  "transform": "none" | "zscore" | "volatility" | "drawdown" | "correlation" | "beta" | "relative_strength" | "pca",
+  "transform": "none" | "zscore" | "volatility" | "drawdown" | "correlation" | "beta" | "relative_strength" | "pca" | "sharpe" | "sortino" | "cointegration" | "drawdown_duration" | "granger",
   "secondary_asset": "COLUMN_NAME" or null,      # Required for correlation, beta, relative_strength
   "window": int or null,                          # Window for rolling calculations (default: 60)
   "normalize": boolean,                           # Set to true if comparing assets of different scales
