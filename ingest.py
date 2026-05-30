@@ -11,8 +11,12 @@ with conditional caching using db.py. Minimizes network requests and aligns data
 import os
 import datetime
 import requests
+import time
+import random
+from functools import wraps
 import pandas as pd
 import yfinance as yf
+from curl_cffi import requests as curl_requests
 from dotenv import load_dotenv
 import db
 
@@ -62,6 +66,40 @@ YF_TICKERS = {
 }
 
 # -----------------------------------------------------------------------------
+# RETRY & BROWSER WORKAROUNDS
+# -----------------------------------------------------------------------------
+
+def retry_with_backoff(retries=5, delay=3):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for i in range(retries):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    err_msg = str(e).lower()
+                    if "rate limit" in err_msg or "too many requests" in err_msg or "429" in err_msg or "forbidden" in err_msg or "status code 403" in err_msg:
+                        wait = delay * (2 ** i) + random.uniform(0, 1)
+                        print(f"Rate limited or forbidden. Retrying in {wait:.1f}s... (Attempt {i+1}/{retries})")
+                        time.sleep(wait)
+                    else:
+                        wait = delay + random.uniform(0, 1)
+                        print(f"Fetch failed: {e}. Retrying in {wait:.1f}s... (Attempt {i+1}/{retries})")
+                        time.sleep(wait)
+            print("Max retries exceeded for yfinance fetch.")
+            return pd.DataFrame()
+        return wrapper
+    return decorator
+
+@retry_with_backoff(retries=5, delay=3)
+def _download_yf_with_retry(ticker: str, start=None, end=None, period=None) -> pd.DataFrame:
+    session = curl_requests.Session(impersonate="chrome")
+    if period:
+        return yf.download(ticker, period=period, progress=False, session=session)
+    else:
+        return yf.download(ticker, start=start, end=end, progress=False, session=session)
+
+# -----------------------------------------------------------------------------
 # HEALTH CHECKS
 # -----------------------------------------------------------------------------
 
@@ -95,8 +133,8 @@ def check_stablecoins_api() -> tuple[bool, str]:
 
 def check_yfinance_api() -> tuple[bool, str]:
     try:
-        spy = yf.download("SPY", period="1d", progress=False)
-        if not spy.empty:
+        spy = _download_yf_with_retry("SPY", period="1d")
+        if spy is not None and not spy.empty:
             return True, "Yahoo Finance: OK"
         return False, "Yahoo Finance: Empty dataset"
     except Exception as e:
@@ -185,8 +223,8 @@ def fetch_yf_series(ticker: str, column_name: str, start_date: datetime.date = N
     s_date = start_date or START_DATE
     e_date = end_date or END_DATE
     try:
-        df = yf.download(ticker, start=s_date, end=e_date, progress=False)
-        if df.empty:
+        df = _download_yf_with_retry(ticker, start=s_date, end=e_date)
+        if df is None or df.empty:
             return pd.DataFrame()
             
         df = df.reset_index()
