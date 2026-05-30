@@ -12,11 +12,8 @@ and executes deterministic analytical operations on the dataset.
 import os
 import json
 import re
-import google.auth
-# Disable conflicting gcloud ADC credentials to let the developer API key take precedence
-google.auth.default = lambda *args, **kwargs: (None, None)
-
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import pandas as pd
 import numpy as np
 from dotenv import load_dotenv
@@ -26,8 +23,9 @@ import analytics
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
+client = None
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+    client = genai.Client(api_key=GEMINI_API_KEY)
 
 # -----------------------------------------------------------------------------
 # SEMANTIC INTENT PARSER
@@ -38,23 +36,23 @@ def parse_intent(user_prompt: str) -> dict:
     Translates user query into a structured execution plan.
     Uses Gemini Flash if configured, else falls back to a deterministic regex parser.
     """
-    if not GEMINI_API_KEY:
+    if not client:
         plan = run_fallback_parser(user_prompt)
         plan["parse_method"] = "local"
         return plan
         
     try:
-        # Configure model
-        model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash",
-            generation_config={"response_mime_type": "application/json"}
-        )
-        
         # Build prompt
         full_prompt = f"{prompts.INTENT_SYSTEM_PROMPT}\n\nUSER PROMPT: '{user_prompt}'\nJSON EXECUTION PLAN:"
         
         # Invoke API
-        response = model.generate_content(full_prompt)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=full_prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json"
+            )
+        )
         plan = json.loads(response.text.strip())
         
         # Verify defaults
