@@ -434,13 +434,13 @@ def build_macro_chart(
         reg_df["date"] = pd.to_datetime(reg_df["date"])
         reg_df["next_date"] = reg_df["date"].shift(-1).fillna(reg_df["date"] + pd.Timedelta(days=1))
         
-        # Color mapping for regimes
+        # Color mapping for regimes (HEX colors for stability in Altair scales)
         regime_colors = {
-            "Oil Supply Shock": "rgba(244, 67, 54, 0.20)",   # Red
-            "Oil Demand Shock": "rgba(76, 175, 80, 0.15)",   # Green
-            "Flight to Safety": "rgba(255, 152, 0, 0.18)",   # Orange
-            "Expansionary": "rgba(0, 229, 255, 0.12)",       # Cyan
-            "Neutral": "rgba(45, 55, 72, 0.05)"              # Muted grey
+            "Oil Supply Shock": "#ef4444",   # Red
+            "Oil Demand Shock": "#22c55e",   # Green
+            "Flight to Safety": "#f97316",   # Orange
+            "Expansionary": "#00e5ff",       # Cyan
+            "Neutral": "#1e293b"             # Muted slate/grey
         }
         
         # Find unique regimes in data to populate correct domain
@@ -448,7 +448,8 @@ def build_macro_chart(
         domain = [r for r in regime_colors.keys() if r in unique_regimes]
         color_range = [regime_colors[r] for r in domain]
 
-        shading = alt.Chart(reg_df).mark_rect(opacity=0.6).encode(
+        # Use a very subtle opacity (0.08) so the background shading does not obstruct the data lines
+        shading = alt.Chart(reg_df).mark_rect(opacity=0.08).encode(
             x=alt.X("date:T"),
             x2="next_date:T",
             color=alt.Color(
