@@ -408,7 +408,7 @@ def calculate_stress_composite(df: pd.DataFrame) -> pd.DataFrame:
 
 # Try to import scipy for Granger Causality; handle gracefully if not installed
 try:
-    from scipy.stats import f as f_dist
+    from scipy.stats import f as f_dist  # type: ignore
     HAS_SCIPY = True
 except ImportError:
     HAS_SCIPY = False
