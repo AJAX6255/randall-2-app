@@ -1,0 +1,84 @@
+===============================================================================
+                       SEMANTIC MACRO OS - EXERCISE TERMINAL PROMPTS
+===============================================================================
+This file contains curated conversational prompts designed to exercise every
+deterministic transform in `analytics.py` and every visual indicator option
+supported in `visuals.py` / `orchestrator.py`. 
+
+Copy and paste these prompts directly into the conversational input box at the 
+bottom of the dashboard to verify execution.
+
+-------------------------------------------------------------------------------
+PART 1: TESTING CORE ANALYTICAL PRIMITIVES (TRANSFORMS)
+-------------------------------------------------------------------------------
+
+1. Raw Price / Value comparison ("none")
+   Prompt: "Plot the raw price history of SPY and GLD side-by-side"
+
+2. Rolling Z-Score ("zscore")
+   Prompt: "Show the 60-day rolling Z-score of Bitcoin (BTC)"
+
+3. Rolling Volatility ("volatility")
+   Prompt: "Calculate the 30-day rolling annualized volatility of DRAM"
+
+4. Drawdown from Peak ("drawdown")
+   Prompt: "Show the percentage drawdown of Bitcoin from its running peak"
+
+5. Rolling Correlation ("correlation")
+   Prompt: "Compare SPY and TLT rolling 60-day correlation"
+
+6. Rolling Beta ("beta")
+   Prompt: "Calculate the 90-day rolling beta of DRAM relative to SPY"
+
+7. Relative Strength / Ratio ("relative_strength")
+   Prompt: "Plot the relative strength ratio of JNK divided by TLT"
+
+8. Rolling PCA Systemic Risk Factor ("pca")
+   Prompt: "Calculate the rolling PCA first principal component across SPY, VIX, TLT, and JNK using a 60 day window"
+
+9. Rolling Sharpe Ratio ("sharpe")
+   Prompt: "Show the rolling 60-day Sharpe ratio of SPY using FFR as the risk-free rate"
+
+10. Rolling Sortino Ratio ("sortino")
+    Prompt: "Show the rolling 60-day Sortino ratio of BTC using FFR as the risk-free rate"
+
+11. Cointegration Spread ("cointegration")
+    Prompt: "Plot the rolling cointegration spread of SPY relative to TLT"
+
+12. Drawdown Recovery Duration ("drawdown_duration")
+    Prompt: "Calculate the rolling drawdown recovery duration of Bitcoin in business days"
+
+13. Granger Causality p-value ("granger")
+    Prompt: "Run a rolling Granger causality test to see if SOFR leads SPY with a window of 60 days"
+
+
+-------------------------------------------------------------------------------
+PART 2: TESTING PLOT ENGINE OVERLAYS & GRAPHING FEATURES
+-------------------------------------------------------------------------------
+
+1. Bollinger Bands
+   Prompt: "Plot SPY and show the 20-day Bollinger Bands"
+
+2. SMA Golden / Death Crossovers
+   Prompt: "Show the 50-day and 200-day simple moving average crossovers for Bitcoin"
+
+3. Top-K Extreme Stress Event Highlights
+   Prompt: "Highlight the top 5 absolute single-day returns for SPY"
+
+4. Exponential Smoothing
+   Prompt: "Plot VIX and apply exponential smoothing with a span of 10"
+
+5. Base-100 Normalization
+   Prompt: "Compare SPY, BTC, and GLD using base-100 normalization"
+
+6. Event Anchor Date Alignment
+   Prompt: "Normalize and anchor SPY, BTC, and TLT relative to the date 2025-11-01"
+
+7. Reference Horizontal Y-Lines
+   Prompt: "Show the SOFR spread and add a reference line at zero"
+
+8. Advanced Multi-Layer Markers (Lines & Highlight Bands)
+   Prompt: "Plot VIX and add custom horizontal lines at 20 and 30, a vertical line at 2025-12-25, and a band between 15 and 25"
+
+9. Systemic Stress & Macro Regime Shading
+   Prompt: "Compare Bitcoin and Gold with macro supply/demand regime shading on the chart"
