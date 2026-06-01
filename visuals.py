@@ -324,12 +324,12 @@ def build_macro_chart(
 
     # Reference Y Line
     if reference_y is not None:
-        ref_line = alt.Chart().mark_rule(
+        ref_line = alt.Chart(pd.DataFrame([{"y": reference_y}])).mark_rule(
             color="#cbd5e0",
             strokeDash=[4, 4],
             strokeWidth=1.5
         ).encode(
-            y=alt.datum(reference_y)
+            y=alt.Y("y:Q")
         )
         layers.append(ref_line)
 
@@ -339,17 +339,17 @@ def build_macro_chart(
             val = line.get("value")
             label = line.get("label", "")
             if val is not None:
-                h_line = alt.Chart().mark_rule(
+                h_line = alt.Chart(pd.DataFrame([{"y": val}])).mark_rule(
                     color="#eab308",
                     strokeDash=[4, 4],
                     strokeWidth=1.5
                 ).encode(
-                    y=alt.datum(val)
+                    y=alt.Y("y:Q")
                 )
                 layers.append(h_line)
                 
                 if label:
-                    h_label = alt.Chart().mark_text(
+                    h_label = alt.Chart(pd.DataFrame([{"y": val}])).mark_text(
                         align="left",
                         dx=8,
                         dy=-5,
@@ -358,8 +358,8 @@ def build_macro_chart(
                         fontWeight="bold"
                     ).encode(
                         x=alt.value(10),
-                        y=alt.datum(val),
-                        text=alt.datum(label)
+                        y=alt.Y("y:Q"),
+                        text=alt.value(label)
                     )
                     layers.append(h_label)
 
@@ -370,17 +370,17 @@ def build_macro_chart(
             label = line.get("label", "")
             if date_val:
                 iso_date = pd.to_datetime(date_val).isoformat()
-                v_line = alt.Chart().mark_rule(
+                v_line = alt.Chart(pd.DataFrame([{"x": iso_date}])).mark_rule(
                     color="#718096",
                     strokeDash=[4, 4],
                     strokeWidth=1.5
                 ).encode(
-                    x=alt.datum(iso_date)
+                    x=alt.X("x:T")
                 )
                 layers.append(v_line)
                 
                 if label:
-                    v_label = alt.Chart().mark_text(
+                    v_label = alt.Chart(pd.DataFrame([{"x": iso_date}])).mark_text(
                         align="left",
                         angle=270,
                         dx=8,
@@ -389,9 +389,9 @@ def build_macro_chart(
                         fontSize=10,
                         fontWeight="bold"
                     ).encode(
-                        x=alt.datum(iso_date),
+                        x=alt.X("x:T"),
                         y=alt.value(20),
-                        text=alt.datum(label)
+                        text=alt.value(label)
                     )
                     layers.append(v_label)
 
@@ -402,17 +402,17 @@ def build_macro_chart(
             ymax = band.get("ymax")
             label = band.get("label", "")
             if ymin is not None and ymax is not None:
-                band_rect = alt.Chart().mark_rect(
+                band_rect = alt.Chart(pd.DataFrame([{"ymin": ymin, "ymax": ymax}])).mark_rect(
                     color="#00e5ff",
                     opacity=0.08
                 ).encode(
-                    y=alt.datum(ymin),
-                    y2=alt.datum(ymax)
+                    y=alt.Y("ymin:Q"),
+                    y2=alt.Y("ymax:Q")
                 )
                 layers.insert(0, band_rect)
                 
                 if label:
-                    band_label = alt.Chart().mark_text(
+                    band_label = alt.Chart(pd.DataFrame([{"ymin": ymin}])).mark_text(
                         align="left",
                         dx=8,
                         dy=12,
@@ -422,8 +422,8 @@ def build_macro_chart(
                         opacity=0.7
                     ).encode(
                         x=alt.value(10),
-                        y=alt.datum(ymin),
-                        text=alt.datum(label)
+                        y=alt.Y("ymin:Q"),
+                        text=alt.value(label)
                     )
                     layers.append(band_label)
 
