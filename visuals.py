@@ -262,22 +262,21 @@ def build_macro_chart(
         layers.insert(0, bb_band)
         layers.append(bb_sma)
 
-    # 1. ALWAYS calculate moving averages on the continuous data stream
-    # This keeps calculations safe and un-broken for internal tracking
-    sma_base = alt.Chart(melted_df).transform_window(
-        sma50="mean(Value)",
-        frame=[-49, 0],
-        groupby=["Series"],
-        sort=[{"field": "date"}]
-    ).transform_window(
-        sma200="mean(Value)",
-        frame=[-199, 0],
-        groupby=["Series"],
-        sort=[{"field": "date"}]
-    )
-
-    # 2. ONLY render and append the lines/markers if show_crossovers is True
+    # SMA Crossovers (Golden & Death Crosses)
     if show_crossovers:
+        # Calculate moving averages on the continuous data stream inside the conditional
+        sma_base = alt.Chart(melted_df).transform_window(
+            sma50="mean(Value)",
+            frame=[-49, 0],
+            groupby=["Series"],
+            sort=[{"field": "date"}]
+        ).transform_window(
+            sma200="mean(Value)",
+            frame=[-199, 0],
+            groupby=["Series"],
+            sort=[{"field": "date"}]
+        )
+
         # Build the continuous 50-day and 200-day SMA lines
         sma50_line = sma_base.mark_line(strokeWidth=1.5, strokeDash=[4, 2], opacity=0.8).encode(
             x=x_scale_spec,
