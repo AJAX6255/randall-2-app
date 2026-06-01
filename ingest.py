@@ -86,7 +86,7 @@ def retry_with_backoff(retries=5, delay=3):
                         wait = delay + random.uniform(0, 1)
                         print(f"Fetch failed: {e}. Retrying in {wait:.1f}s... (Attempt {i+1}/{retries})")
                         time.sleep(wait)
-            print("Max retries exceeded for yfinance fetch.")
+            print(f"Max retries exceeded for {func.__name__}.")
             return pd.DataFrame()
         return wrapper
     return decorator
@@ -152,6 +152,7 @@ def is_cache_fresh(series_id: str, max_age_hours: int = 12) -> bool:
     age = datetime.datetime.now() - last_updated
     return age.total_seconds() < (max_age_hours * 3600)
 
+@retry_with_backoff(retries=5, delay=3)
 def fetch_fred_series(series_name: str, series_id: str, start_date: datetime.date = None, end_date: datetime.date = None) -> pd.DataFrame:
     """Fetch time series from Federal Reserve Economic Data (FRED)."""
     if not FRED_API_KEY:
@@ -170,19 +171,15 @@ def fetch_fred_series(series_name: str, series_id: str, start_date: datetime.dat
         "observation_end": e_date.strftime("%Y-%m-%d")
     }
     
-    try:
-        res = requests.get(url, params=params, timeout=10)
-        res.raise_for_status()
-        data = res.json()
-        
-        df = pd.DataFrame(data["observations"])
-        df["date"] = pd.to_datetime(df["date"])
-        df["value"] = pd.to_numeric(df["value"], errors="coerce")
-        df.rename(columns={"value": series_name}, inplace=True)
-        return df[["date", series_name]]
-    except Exception as e:
-        print(f"Error fetching FRED series {series_id}: {e}")
-        return pd.DataFrame()
+    res = requests.get(url, params=params, timeout=10)
+    res.raise_for_status()
+    data = res.json()
+    
+    df = pd.DataFrame(data["observations"])
+    df["date"] = pd.to_datetime(df["date"])
+    df["value"] = pd.to_numeric(df["value"], errors="coerce")
+    df.rename(columns={"value": series_name}, inplace=True)
+    return df[["date", series_name]]
 
 def fetch_stablecoin_marketcap(start_date: datetime.date = None, end_date: datetime.date = None) -> pd.DataFrame:
     """Fetch total stablecoin market cap history from Llama.fi."""
