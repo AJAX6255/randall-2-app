@@ -264,7 +264,9 @@ def build_macro_chart(
 
     # SMA Crossovers (Golden & Death Crosses)
     if show_crossovers:
-        crossover_chart = alt.Chart(melted_df).transform_window(
+        # 1. ALWAYS calculate the moving averages on the continuous data stream
+        # Define a base chart containing the window calculations so lines don't break
+        sma_base = alt.Chart(melted_df).transform_window(
             sma50="mean(Value)",
             frame=[-49, 0],
             groupby=["Series"],
@@ -274,7 +276,25 @@ def build_macro_chart(
             frame=[-199, 0],
             groupby=["Series"],
             sort=[{"field": "date"}]
-        ).transform_window(
+        )
+
+        # 2. ALWAYS render the continuous 50-day and 200-day SMA lines
+        sma50_line = sma_base.mark_line(strokeWidth=1.5, strokeDash=[4, 2], opacity=0.8).encode(
+            x=x_scale_spec,
+            y=alt.Y("sma50:Q"),
+            color=alt.value("#ff9800")  # Distinct orange for 50 SMA
+        )
+        
+        sma200_line = sma_base.mark_line(strokeWidth=1.5, strokeDash=[2, 2], opacity=0.8).encode(
+            x=x_scale_spec,
+            y=alt.Y("sma200:Q"),
+            color=alt.value("#4caf50")  # Distinct green for 200 SMA
+        )
+        
+        layers.extend([sma50_line, sma200_line])
+
+        # 3. CONDITIONALLY layer the triangle symbols strictly over those lines
+        crossover_points = sma_base.transform_window(
             window=[
                 {"op": "lag", "field": "sma50", "as": "prev_sma50"},
                 {"op": "lag", "field": "sma200", "as": "prev_sma200"}
@@ -285,15 +305,20 @@ def build_macro_chart(
             crossover="datum.prev_sma50 <= datum.prev_sma200 && datum.sma50 > datum.sma200 ? 'Bullish' : (datum.prev_sma50 >= datum.prev_sma200 && datum.sma50 < datum.sma200 ? 'Bearish' : null)"
         ).transform_filter(
             "datum.crossover != null"
-        )
-        
-        crossover_points = crossover_chart.mark_point(size=120, filled=True).encode(
+        ).mark_point(
+            size=140, 
+            filled=True,
+            stroke="white",      # High-contrast border isolates symbol from background
+            strokeWidth=1.5,
+            fillOpacity=0.85     # Prevents solid occlusion of underlying asset line
+        ).encode(
             x=x_scale_spec,
             y=alt.Y("Value:Q"),
             color=alt.Color("crossover:N", scale=alt.Scale(domain=["Bullish", "Bearish"], range=["#00e676", "#ff3d00"]), legend=alt.Legend(title="Crossover")),
             shape=alt.Shape("crossover:N", scale=alt.Scale(domain=["Bullish", "Bearish"], range=["triangle-up", "triangle-down"]), legend=None),
             tooltip=["date:T", "Series:N", alt.Tooltip("Value:Q", format=".2f"), "crossover:N"]
         )
+        
         layers.append(crossover_points)
 
     # Reference Y Line
@@ -448,6 +473,8 @@ def build_macro_chart(
             fontSize=16,
             fontWeight="bold"
         )
+    ).resolve_scale(
+        color="independent"
     ).interactive()
 
     return chart
