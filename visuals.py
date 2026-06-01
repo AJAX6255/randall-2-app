@@ -263,7 +263,7 @@ def build_macro_chart(
         layers.append(bb_sma)
 
     # 1. ALWAYS calculate moving averages on the continuous data stream
-    # Placed outside the conditional so lines always exist for calculations
+    # This keeps calculations safe and un-broken for internal tracking
     sma_base = alt.Chart(melted_df).transform_window(
         sma50="mean(Value)",
         frame=[-49, 0],
@@ -276,24 +276,25 @@ def build_macro_chart(
         sort=[{"field": "date"}]
     )
 
-    # 2. ALWAYS render the continuous 50-day and 200-day SMA lines
-    sma50_line = sma_base.mark_line(strokeWidth=1.5, strokeDash=[4, 2], opacity=0.8).encode(
-        x=x_scale_spec,
-        y=alt.Y("sma50:Q"),
-        color=alt.value("#ff9800")  # Distinct orange for 50 SMA
-    )
-    
-    sma200_line = sma_base.mark_line(strokeWidth=1.5, strokeDash=[2, 2], opacity=0.8).encode(
-        x=x_scale_spec,
-        y=alt.Y("sma200:Q"),
-        color=alt.value("#4caf50")  # Distinct green for 200 SMA
-    )
-    
-    # Safely push lines to the structural base of the layers list
-    layers.extend([sma50_line, sma200_line])
-
-    # 3. CONDITIONALLY layer the triangle symbols strictly over those lines
+    # 2. ONLY render and append the lines/markers if show_crossovers is True
     if show_crossovers:
+        # Build the continuous 50-day and 200-day SMA lines
+        sma50_line = sma_base.mark_line(strokeWidth=1.5, strokeDash=[4, 2], opacity=0.8).encode(
+            x=x_scale_spec,
+            y=alt.Y("sma50:Q"),
+            color=alt.value("#ff9800")  # Distinct orange for 50 SMA
+        )
+        
+        sma200_line = sma_base.mark_line(strokeWidth=1.5, strokeDash=[2, 2], opacity=0.8).encode(
+            x=x_scale_spec,
+            y=alt.Y("sma200:Q"),
+            color=alt.value("#4caf50")  # Distinct green for 200 SMA
+        )
+        
+        # Lines are added first so they sit below the points
+        layers.extend([sma50_line, sma200_line])
+
+        # Layer the triangle symbols strictly over those lines
         crossover_points = sma_base.transform_window(
             window=[
                 {"op": "lag", "field": "sma50", "as": "prev_sma50"},
@@ -308,12 +309,11 @@ def build_macro_chart(
         ).mark_point(
             size=140, 
             filled=True,
-            stroke="white",      # High-contrast border isolates symbol from background
+            stroke="white",      
             strokeWidth=1.5,
-            fillOpacity=0.85     # Prevents solid occlusion of underlying asset line
+            fillOpacity=0.85     
         ).encode(
             x=x_scale_spec,
-            # FIXED: Map directly to 'sma50' instead of 'Value' so markers anchor perfectly onto the lines
             y=alt.Y("sma50:Q"), 
             color=alt.Color("crossover:N", scale=alt.Scale(domain=["Bullish", "Bearish"], range=["#00e676", "#ff3d00"]), legend=alt.Legend(title="Crossover")),
             shape=alt.Shape("crossover:N", scale=alt.Scale(domain=["Bullish", "Bearish"], range=["triangle-up", "triangle-down"]), legend=None),
