@@ -58,8 +58,9 @@ RULES:
    - "emerging markets" -> "EMB"
    - "funding rates", "sofr ffr" -> "SOFR", "FFR"
 2. The JSON output must match the SCHEMA below exactly.
-3. Be precise with dates (use YYYY-MM-DD format if extracting an anchor date).
+3. Be precise with dates (use YYYY-MM-DD format if extracting an anchor date or vertical line date).
 4. Provide a clear, professional analytical summary in "analysis_text".
+5. Use "horizontal_lines", "vertical_lines", and "bands" to highlight key price thresholds, critical events/dates (e.g., policy pivots, crisis events), or specific valuation/stress zones requested by the user.
 
 JSON OUTPUT SCHEMA:
 {
@@ -75,6 +76,9 @@ JSON OUTPUT SCHEMA:
   "show_bollinger": boolean,                      # If true, show Bollinger Bands (20-day rolling mean +/- 2 std dev)
   "show_crossovers": boolean,                     # If true, show 50/200 SMA golden/death cross markers
   "top_k_stress": int or null,                    # Highlight top-K single-day absolute percent returns
+  "horizontal_lines": [{"value": float, "label": "string"}], # Optional custom horizontal reference lines with labels
+  "vertical_lines": [{"date": "YYYY-MM-DD", "label": "string"}], # Optional custom vertical date markers with labels
+  "bands": [{"ymin": float, "ymax": float, "label": "string"}], # Optional custom horizontal range bands with labels
   "analysis_text": "String describing the analytical reasoning for the chart setup"
 }
 
