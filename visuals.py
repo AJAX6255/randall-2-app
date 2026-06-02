@@ -324,7 +324,7 @@ def build_macro_chart(
 
     # Reference Y Line
     if reference_y is not None:
-        ref_line = alt.Chart(pd.DataFrame([{}])).mark_rule(
+        ref_line = alt.Chart(pd.DataFrame([{"dummy": 0}])).mark_rule(
             color="#cbd5e0",
             strokeDash=[4, 4],
             strokeWidth=1.5
@@ -339,7 +339,7 @@ def build_macro_chart(
             val = line.get("value")
             label = line.get("label", "")
             if val is not None:
-                h_line = alt.Chart(pd.DataFrame([{}])).mark_rule(
+                h_line = alt.Chart(pd.DataFrame([{"dummy": 0}])).mark_rule(
                     color="#eab308",
                     strokeDash=[4, 4],
                     strokeWidth=1.5
@@ -349,7 +349,7 @@ def build_macro_chart(
                 layers.append(h_line)
                 
                 if label:
-                    h_label = alt.Chart(pd.DataFrame([{}])).mark_text(
+                    h_label = alt.Chart(pd.DataFrame([{"dummy": 0}])).mark_text(
                         align="left",
                         dx=8,
                         dy=-5,
@@ -369,7 +369,7 @@ def build_macro_chart(
             date_val = line.get("date")
             label = line.get("label", "")
             if date_val:
-                v_line = alt.Chart(pd.DataFrame([{}])).mark_rule(
+                v_line = alt.Chart(pd.DataFrame([{"dummy": 0}])).mark_rule(
                     color="#718096",
                     strokeDash=[4, 4],
                     strokeWidth=1.5
@@ -381,7 +381,7 @@ def build_macro_chart(
                 layers.append(v_line)
                 
                 if label:
-                    v_label = alt.Chart(pd.DataFrame([{}])).mark_text(
+                    v_label = alt.Chart(pd.DataFrame([{"dummy": 0}])).mark_text(
                         align="left",
                         angle=270,
                         dx=8,
@@ -405,7 +405,7 @@ def build_macro_chart(
             ymax = band.get("ymax")
             label = band.get("label", "")
             if ymin is not None and ymax is not None:
-                band_rect = alt.Chart(pd.DataFrame([{}])).mark_rect(
+                band_rect = alt.Chart(pd.DataFrame([{"dummy": 0}])).mark_rect(
                     color="#00e5ff",
                     opacity=0.08
                 ).encode(
@@ -415,7 +415,7 @@ def build_macro_chart(
                 layers.insert(0, band_rect)
                 
                 if label:
-                    band_label = alt.Chart(pd.DataFrame([{}])).mark_text(
+                    band_label = alt.Chart(pd.DataFrame([{"dummy": 0}])).mark_text(
                         align="left",
                         dx=8,
                         dy=12,
