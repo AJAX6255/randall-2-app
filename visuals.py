@@ -223,7 +223,7 @@ def build_macro_chart(
         ).encode(
             x=x_scale_spec,
             y=alt.Y("Value:Q", scale=y_scale, axis=None),
-            color=alt.Color("Series:N"),
+            color=alt.Color("Series:N", legend=None),
             tooltip=[
                 "date:T",
                 "Series:N",
