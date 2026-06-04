@@ -258,7 +258,37 @@ def fetch_yf_series(ticker: str, column_name: str, start_date: datetime.date = N
 # ORCHESTRATED INGESTION & PIPELINE ALIGNMENT
 # -----------------------------------------------------------------------------
 
-def ingest_all(force: bool = False, start_date: datetime.date = None, end_date: datetime.date = None):
+def ensure_placeholder(series_id: str, s_date, e_date):
+    """
+    Creates a placeholder series with 0.0 values if it does not exist in the database,
+    or if it exists but is stale or doesn't cover the requested range.
+    """
+    needs_gen = False
+    if not is_cache_fresh(series_id, max_age_hours=24):
+        needs_gen = True
+    else:
+        try:
+            df = db.get_series(series_id)
+            if df.empty:
+                needs_gen = True
+            else:
+                cached_min = df["date"].min().date()
+                cached_max = df["date"].max().date()
+                if cached_min > s_date or cached_max < e_date:
+                    needs_gen = True
+        except Exception:
+            needs_gen = True
+
+    if needs_gen:
+        print(f"Generating placeholder for {series_id}...")
+        date_range = pd.bdate_range(start=s_date, end=e_date)
+        df = pd.DataFrame({
+            "date": date_range,
+            series_id: 0.0
+        })
+        db.save_series(series_id, df)
+
+def ingest_all(force: bool = False, start_date: datetime.date = None, end_date: datetime.date = None, elective_tickers: list[str] = None):
     """
     Verify/fetch all series and store them in the DuckDB/Parquet cache.
     """
@@ -290,7 +320,18 @@ def ingest_all(force: bool = False, start_date: datetime.date = None, end_date: 
             if not df.empty:
                 db.save_series(name, df)
 
-def get_aligned_dataset(start_date: datetime.date = None, end_date: datetime.date = None) -> pd.DataFrame:
+    # 4. Elective Tickers
+    if elective_tickers:
+        for ticker in elective_tickers:
+            if ticker and ticker.strip():
+                t_clean = ticker.strip().upper()
+                if force or not is_cache_fresh(t_clean):
+                    print(f"Fetching elective Yahoo Finance ticker: {t_clean}...")
+                    df = fetch_yf_series(t_clean, t_clean, start_date=s_date, end_date=e_date)
+                    if not df.empty:
+                        db.save_series(t_clean, df)
+
+def get_aligned_dataset(start_date: datetime.date = None, end_date: datetime.date = None, elective_tickers: list[str] = None) -> pd.DataFrame:
     """
     Load all cached assets using Polars lazy frames, merge them onto
     a master business-day index, and forward fill.
@@ -321,7 +362,7 @@ def get_aligned_dataset(start_date: datetime.date = None, end_date: datetime.dat
 
     if cache_needs_sync:
         print(f"Cache is empty or doesn't cover requested range ({s_date} to {e_date}). Running initial sync...")
-        ingest_all(force=True, start_date=s_date, end_date=e_date)
+        ingest_all(force=True, start_date=s_date, end_date=e_date, elective_tickers=elective_tickers)
         all_cached = db.get_all_cached_series()
 
     # Define business day skeleton
@@ -341,11 +382,56 @@ def get_aligned_dataset(start_date: datetime.date = None, end_date: datetime.dat
         stable_df.rename(columns={"stablecoin_mkt_cap": "Stablecoin Mkt Cap"}, inplace=True)
         master_df = master_df.merge(stable_df, on="date", how="left")
 
-    # Merge Yahoo Finance
+    # Merge Yahoo Finance standard
     for name in YF_TICKERS.keys():
         df = db.get_series(name)
         if not df.empty:
             master_df = master_df.merge(df, on="date", how="left")
+
+    # Merge Elective Tickers
+    elective_slots = [("ELECTIVE_1", None), ("ELECTIVE_2", None)]
+    if elective_tickers:
+        if len(elective_tickers) > 0:
+            elective_slots[0] = ("ELECTIVE_1", elective_tickers[0])
+        if len(elective_tickers) > 1:
+            elective_slots[1] = ("ELECTIVE_2", elective_tickers[1])
+
+    for slot_name, ticker in elective_slots:
+        if ticker and ticker.strip():
+            t_clean = ticker.strip().upper()
+            # If not cached/fresh, fetch it
+            if not is_cache_fresh(t_clean):
+                print(f"Fetching elective ticker: {t_clean}...")
+                df = fetch_yf_series(t_clean, t_clean, start_date=s_date, end_date=e_date)
+                if not df.empty:
+                    db.save_series(t_clean, df)
+                else:
+                    # Log / show warning and use placeholder
+                    try:
+                        import streamlit as st
+                        st.sidebar.warning(f"Failed to fetch stock ticker '{t_clean}'. Using placeholder.")
+                    except Exception:
+                        pass
+                    ensure_placeholder(slot_name, s_date, e_date)
+                    t_clean = None
+            
+            if t_clean:
+                df = db.get_series(t_clean)
+                if not df.empty:
+                    master_df = master_df.merge(df, on="date", how="left")
+                    master_df[slot_name] = master_df[t_clean]
+                else:
+                    ensure_placeholder(slot_name, s_date, e_date)
+                    df_placeholder = db.get_series(slot_name)
+                    master_df = master_df.merge(df_placeholder, on="date", how="left")
+            else:
+                ensure_placeholder(slot_name, s_date, e_date)
+                df_placeholder = db.get_series(slot_name)
+                master_df = master_df.merge(df_placeholder, on="date", how="left")
+        else:
+            ensure_placeholder(slot_name, s_date, e_date)
+            df_placeholder = db.get_series(slot_name)
+            master_df = master_df.merge(df_placeholder, on="date", how="left")
 
     # Sort, align and forward fill
     master_df.sort_values("date", inplace=True)

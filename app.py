@@ -114,7 +114,11 @@ def handle_chat_submit():
     user_query = st.session_state.user_chat_input
     if user_query:
         st.session_state.chat_history.append({"role": "user", "content": user_query})
-        new_plan = orchestrator.parse_intent(user_query)
+        elective_tickers = [
+            st.session_state.get("ticker_1_input", "").strip(),
+            st.session_state.get("ticker_2_input", "").strip()
+        ]
+        new_plan = orchestrator.parse_intent(user_query, elective_tickers=elective_tickers)
         st.session_state.active_plan = new_plan
         analysis = new_plan.get("analysis_text", "Execution plan prepared.")
         st.session_state.chat_history.append({"role": "assistant", "content": analysis})
@@ -170,12 +174,20 @@ with st.sidebar:
             
     st.markdown("---")
 
+    # Elective Tickers
+    st.subheader("📈 Elective Tickers")
+    ticker_1 = st.text_input("Stock Ticker 1", value="", key="ticker_1_input", placeholder="e.g. AAPL")
+    ticker_2 = st.text_input("Stock Ticker 2", value="", key="ticker_2_input", placeholder="e.g. MSFT")
+    elective_tickers = [ticker_1.strip(), ticker_2.strip()]
+
+    st.markdown("---")
+
     # 2. Database Controls
     st.subheader("💾 Caching Controls")
     if st.button("Force Database Sync", use_container_width=True):
         with st.spinner("Downloading fresh financial time-series..."):
             start_date, end_date = ingest.get_date_range(st.session_state.active_timeframe)
-            ingest.ingest_all(force=True, start_date=start_date, end_date=end_date)
+            ingest.ingest_all(force=True, start_date=start_date, end_date=end_date, elective_tickers=elective_tickers)
             st.success("Database fully synchronized!")
             st.rerun()
 
@@ -205,7 +217,7 @@ st.markdown("LLM-orchestrated quantitative time-series exploration environment."
 # Load baseline dataset
 try:
     start_date, end_date = ingest.get_date_range(st.session_state.active_timeframe)
-    master_df = ingest.get_aligned_dataset(start_date=start_date, end_date=end_date)
+    master_df = ingest.get_aligned_dataset(start_date=start_date, end_date=end_date, elective_tickers=elective_tickers)
 except Exception as e:
     st.error(f"Failed to fetch initial dataset: {e}")
     st.stop()
@@ -251,7 +263,7 @@ if selected_timeframe != st.session_state.active_timeframe:
     st.session_state.active_timeframe = selected_timeframe
     with st.spinner(f"Resyncing historical data for {selected_timeframe} timeframe..."):
         start_date, end_date = ingest.get_date_range(selected_timeframe)
-        ingest.ingest_all(force=True, start_date=start_date, end_date=end_date)
+        ingest.ingest_all(force=True, start_date=start_date, end_date=end_date, elective_tickers=elective_tickers)
     st.success(f"Synchronized cache for {selected_timeframe} timeframe!")
     st.rerun()
 

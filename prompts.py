@@ -84,3 +84,24 @@ JSON OUTPUT SCHEMA:
 
 Respond ONLY with the raw JSON object. Do not include markdown wraps or preambles.
 """
+
+def get_intent_system_prompt(elective_tickers: list[str] = None) -> str:
+    """
+    Returns the system prompt with active custom elective tickers dynamically injected.
+    """
+    base_prompt = INTENT_SYSTEM_PROMPT
+    
+    custom_lines = ""
+    if elective_tickers:
+        for ticker in elective_tickers:
+            if ticker and ticker.strip():
+                t_clean = ticker.strip().upper()
+                custom_lines += f"\n- \"{t_clean}\": User-defined custom stock ticker {t_clean}"
+                
+    if custom_lines:
+        insert_marker = "- \"BTC\": Bitcoin (USD)"
+        if insert_marker in base_prompt:
+            parts = base_prompt.split(insert_marker)
+            return parts[0] + insert_marker + custom_lines + parts[1]
+            
+    return base_prompt

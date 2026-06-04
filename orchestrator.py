@@ -31,19 +31,20 @@ if GEMINI_API_KEY:
 # SEMANTIC INTENT PARSER
 # -----------------------------------------------------------------------------
 
-def parse_intent(user_prompt: str) -> dict:
+def parse_intent(user_prompt: str, elective_tickers: list[str] = None) -> dict:
     """
     Translates user query into a structured execution plan.
     Uses Gemini Flash if configured, else falls back to a deterministic regex parser.
     """
     if not client:
-        plan = run_fallback_parser(user_prompt)
+        plan = run_fallback_parser(user_prompt, elective_tickers)
         plan["parse_method"] = "local"
         return plan
         
     try:
         # Build prompt
-        full_prompt = f"{prompts.INTENT_SYSTEM_PROMPT}\n\nUSER PROMPT: '{user_prompt}'\nJSON EXECUTION PLAN:"
+        system_prompt = prompts.get_intent_system_prompt(elective_tickers)
+        full_prompt = f"{system_prompt}\n\nUSER PROMPT: '{user_prompt}'\nJSON EXECUTION PLAN:"
         
         # Invoke API
         response = client.models.generate_content(
@@ -72,11 +73,11 @@ def parse_intent(user_prompt: str) -> dict:
         
     except Exception as e:
         print(f"Gemini API Error: {e}. Running fallback parser.")
-        plan = run_fallback_parser(user_prompt)
+        plan = run_fallback_parser(user_prompt, elective_tickers)
         plan["parse_method"] = "fallback"
         return plan
 
-def run_fallback_parser(user_prompt: str) -> dict:
+def run_fallback_parser(user_prompt: str, elective_tickers: list[str] = None) -> dict:
     """
     Simple keyword parser in case Gemini API is offline or key is missing.
     """
@@ -120,6 +121,13 @@ def run_fallback_parser(user_prompt: str) -> dict:
         "sofr_spread": "SOFR_Spread", "spread": "SOFR_Spread",
         "stablecoin": "Stablecoin Mkt Cap", "llama": "Stablecoin Mkt Cap"
     }
+
+    # Dynamically inject elective tickers
+    if elective_tickers:
+        for ticker in elective_tickers:
+            if ticker and ticker.strip():
+                t_clean = ticker.strip().upper()
+                asset_map[t_clean.lower()] = t_clean
 
     found_cols = []
     for word, col in asset_map.items():
